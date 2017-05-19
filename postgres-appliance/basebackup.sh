@@ -27,24 +27,24 @@ done
 
 [[ -z $DATA_DIR || -z $CONNSTR || ! $RETRIES =~ ^[1-9]$ ]] && exit 1
 
-function receivexlog() {
-    pg_receivexlog --directory="${XLOG_FAST}" --dbname="${CONNSTR}" &
-    receivexlog_pid=$!
+function receivewal() {
+    pg_receivewal --directory="${XLOG_FAST}" --dbname="${CONNSTR}" &
+    receivewal_pid=$!
 
-    # run pg_receivexlog until postgres will not start streaming
+    # run pg_receivewal until postgres will not start streaming
     while ! ps ax | grep -qE '[w]al receiver process\s+streaming'; do
-        # exit if pg_receivexlog is not running
-        kill -0 $receivexlog_pid && sleep 1 || exit
+        # exit if pg_receivewal is not running
+        kill -0 $receivewal_pid && sleep 1 || exit
     done
 
-    kill $receivexlog_pid && sleep 1
+    kill $receivewal_pid && sleep 1
     rm -f ${XLOG_FAST}/*
 }
 
 ATTEMPT=0
 while [[ $((ATTEMPT++)) -le $RETRIES ]]; do
     rm -fr "${DATA_DIR}"
-    pg_basebackup --pgdata="${DATA_DIR}" --xlog-method=stream --dbname="${CONNSTR}"
+    pg_basebackup --pgdata="${DATA_DIR}" --wal-method=stream --dbname="${CONNSTR}"
     EXITCODE=$?
     if [[ $EXITCODE == 0 ]]; then
         XLOG_FAST=$(dirname $DATA_DIR)/xlog_fast
@@ -53,7 +53,7 @@ while [[ $((ATTEMPT++)) -le $RETRIES ]]; do
         rm -fr $XLOG_FAST/archive_status
         mkdir ${DATA_DIR}/pg_xlog
 
-        receivexlog &
+        receivewal &
         break
     elif [[ $ATTEMPT -le $RETRIES ]]; then
         sleep $((ATTEMPT*10))

@@ -18,7 +18,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PostgreSQL
-ENV PGVERSION=9.6 PGOLDVERSIONS="9.3 9.4 9.5"
+ENV PGVERSION=10 PGOLDVERSIONS="9.3 9.4 9.5 9.6"
 RUN export DEBIAN_FRONTEND=noninteractive \
     && export BUILD_PACKAGES="gcc libc6-dev dpkg-dev make pgxnclient libedit-dev zlib1g-dev libssl-dev libselinux1-dev libkrb5-dev libxslt1-dev libxml2-dev libpam0g-dev libcurl4-openssl-dev libprotobuf-c-dev liblwgeom-dev pkg-config libproj-dev libevent-dev" \
 
@@ -48,7 +48,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get install -y libprotobuf-c1 libevent-2.0 $BUILD_PACKAGES \
 
     # prepare bg_mon sources
-    && export BG_MON_COMMIT=ca99fac2fa9aed6284da481ccdb5395ccfa1fd6a \
+    && export BG_MON_COMMIT=9fc9427adef48d44adcd4070b05eea8e32f2a0e7 \
     && curl -s -L https://github.com/CyberDem0n/bg_mon/archive/$BG_MON_COMMIT.tar.gz | tar xz \
 
     && export DECODEBUFS_COMMIT=d9415fc78fa255d990ea2371720876bebe34ceb9 \
@@ -61,17 +61,23 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 
             # Install PostgreSQL binaries, contrib, pgq, plproxy, pgq and multiple pl's
             && apt-get install --allow-downgrades -y postgresql-${version} postgresql-${version}-dbg \
-                        postgresql-client-${version} postgresql-contrib-${version} postgresql-${version}-plproxy \
-                        postgresql-${version}-pgq3 postgresql-${version}-postgis-2.3 postgresql-plpython3-${version} \
-                        postgresql-plpython-${version} postgresql-${version}-plr postgresql-pltcl-${version} \
-                        postgresql-${version}-plv8 postgresql-${version}-pllua postgresql-plperl-${version} \
+                        postgresql-client-${version} postgresql-contrib-${version} \
+                        postgresql-plpython3-${version} postgresql-plpython-${version} \
+                        postgresql-pltcl-${version} postgresql-plperl-${version} \
                         libpq5=$version* libpq-dev=$version* postgresql-server-dev-${version} \
+
+            && if [ "$version" != "10" ]; then \
+                apt-get install -y postgresql-${version}-plproxy postgresql-${version}-pgq3 \
+                            postgresql-${version}-postgis-2.3 postgresql-${version}-plr \
+                            postgresql-${version}-plv8 postgresql-${version}-pllua \
+                && pgxn install pg_repack; \
+            fi \
 
             # Install bg_mon
             && make -C bg_mon-${BG_MON_COMMIT} USE_PGXS=1 clean install \
 
             # install 3rd party extensions
-            && for extension in quantile trimmed_aggregates pg_repack; do \
+            && for extension in quantile trimmed_aggregates; do \
                 pgxn install $extension; \
             done \
 
@@ -113,10 +119,9 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 ENV PATH=$PATH:/usr/lib/postgresql/${PGVERSION}/bin
 
 # Install patroni and WAL-e
-ENV PATRONIVERSION=1.2.5
 ENV WALE_VERSION=1.0.3
 RUN export DEBIAN_FRONTEND=noninteractive \
-    export BUILD_PACKAGES="python3-pip" \
+    export BUILD_PACKAGES="python3-pip git" \
     && apt-get update \
     && apt-get install -y \
             # Required for wal-e
@@ -126,7 +131,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
             ${BUILD_PACKAGES} \
 
     && pip3 install pip --upgrade \
-    && pip3 install --upgrade patroni==$PATRONIVERSION \
+    && pip3 install --upgrade 'git+https://github.com/zalando/patroni.git@5d99f9c17beb66b5dec176a884ee7a047c711cb4#egg=patroni' \
             gcloud boto wal-e==$WALE_VERSION \
 
     # https://github.com/wal-e/wal-e/issues/318
