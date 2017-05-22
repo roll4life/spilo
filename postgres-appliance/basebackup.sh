@@ -28,7 +28,7 @@ done
 [[ -z $DATA_DIR || -z $CONNSTR || ! $RETRIES =~ ^[1-9]$ ]] && exit 1
 
 function receivewal() {
-    pg_receivewal --directory="${XLOG_FAST}" --dbname="${CONNSTR}" &
+    pg_receivewal --directory="${WAL_FAST}" --dbname="${CONNSTR}" &
     receivewal_pid=$!
 
     # run pg_receivewal until postgres will not start streaming
@@ -38,7 +38,7 @@ function receivewal() {
     done
 
     kill $receivewal_pid && sleep 1
-    rm -f ${XLOG_FAST}/*
+    rm -f ${WAL_FAST}/*
 }
 
 ATTEMPT=0
@@ -47,11 +47,15 @@ while [[ $((ATTEMPT++)) -le $RETRIES ]]; do
     pg_basebackup --pgdata="${DATA_DIR}" --wal-method=stream --dbname="${CONNSTR}"
     EXITCODE=$?
     if [[ $EXITCODE == 0 ]]; then
-        XLOG_FAST=$(dirname $DATA_DIR)/xlog_fast
-        rm -fr $XLOG_FAST
-        mv ${DATA_DIR}/pg_xlog $XLOG_FAST
-        rm -fr $XLOG_FAST/archive_status
-        mkdir ${DATA_DIR}/pg_xlog
+        WAL_FAST=$(dirname $DATA_DIR)/wal_fast
+        WAL_DIR=${DATA_DIR}/pg_wal
+        if [[ ! -d ${WAL_DIR} ]]; then
+            WAL_DIR=${DATA_DIR}/pg_xlog
+        fi
+        rm -fr $WAL_FAST
+        mv $WAL_DIR $WAL_FAST
+        rm -fr $WAL_FAST/archive_status
+        mkdir $WAL_DIR
 
         receivewal &
         break

@@ -119,7 +119,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 ENV PATH=$PATH:/usr/lib/postgresql/${PGVERSION}/bin
 
 # Install patroni and WAL-e
-ENV WALE_VERSION=1.0.3
+ENV WALE_VERSION=1.1.0b1
 RUN export DEBIAN_FRONTEND=noninteractive \
     export BUILD_PACKAGES="python3-pip git" \
     && apt-get update \
@@ -131,7 +131,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
             ${BUILD_PACKAGES} \
 
     && pip3 install pip --upgrade \
-    && pip3 install --upgrade 'git+https://github.com/zalando/patroni.git@5d99f9c17beb66b5dec176a884ee7a047c711cb4#egg=patroni' \
+    && pip3 install --upgrade 'git+https://github.com/zalando/patroni.git@e3a01727a90fdbb901c278d4b8a0fbb3e54b4005#egg=patroni' \
             gcloud boto wal-e==$WALE_VERSION \
 
     # https://github.com/wal-e/wal-e/issues/318
@@ -174,6 +174,6 @@ RUN chmod 700 /postgres_*
 ENV ETCD_DISCOVERY_DOMAIN=postgres.acid.example.com LC_ALL=en_US.utf-8
 
 WORKDIR $PGHOME
-EXPOSE 5432 8008
+EXPOSE 5432 8008 8080
 RUN chown -R postgres:postgres /postgres_* $PGHOME
 CMD ["/bin/bash", "/launch.sh"]
