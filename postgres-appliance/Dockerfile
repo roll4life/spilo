@@ -119,6 +119,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 ENV PATH=$PATH:/usr/lib/postgresql/${PGVERSION}/bin
 
 # Install patroni and WAL-e
+ENV PATRONIVERSION=1.3
 ENV WALE_VERSION=1.1.0b1
 RUN export DEBIAN_FRONTEND=noninteractive \
     export BUILD_PACKAGES="python3-pip git" \
