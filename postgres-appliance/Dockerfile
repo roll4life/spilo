@@ -121,8 +121,9 @@ ENV PATH=$PATH:/usr/lib/postgresql/${PGVERSION}/bin
 # Install patroni and WAL-e
 ENV PATRONIVERSION=1.3
 ENV WALE_VERSION=1.1.0b1
+ADD wal-e-pg10.patch
 RUN export DEBIAN_FRONTEND=noninteractive \
-    export BUILD_PACKAGES="python3-pip git" \
+    export BUILD_PACKAGES="python3-pip git patch" \
     && apt-get update \
     && apt-get install -y \
             # Required for wal-e
@@ -137,6 +138,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 
     # https://github.com/wal-e/wal-e/issues/318
     && sed -i 's/^\(    for i in range(0,\) num_retries):.*/\1 100):/g' /usr/local/lib/python3.5/dist-packages/boto/utils.py \
+    && cd /usr/local/lib/python3.5/dist-packages/wal_e && patch -p2 < /wal-e-pg10.patch \
 
     # Clean up
     && apt-get purge -y ${BUILD_PACKAGES} \
