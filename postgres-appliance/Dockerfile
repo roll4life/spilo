@@ -20,7 +20,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 # Install PostgreSQL
 ENV PGVERSION=10 PGOLDVERSIONS="9.3 9.4 9.5 9.6"
 RUN export DEBIAN_FRONTEND=noninteractive \
-    && export BUILD_PACKAGES="gcc libc6-dev dpkg-dev make pgxnclient libedit-dev zlib1g-dev libssl-dev libselinux1-dev libkrb5-dev libxslt1-dev libxml2-dev libpam0g-dev libcurl4-openssl-dev libprotobuf-c-dev liblwgeom-dev pkg-config libproj-dev libevent-dev" \
+    && export BUILD_PACKAGES="devscripts build-essential pgxnclient libedit-dev zlib1g-dev libssl-dev libselinux1-dev libkrb5-dev libxslt1-dev libxml2-dev libpam0g-dev libcurl4-openssl-dev libprotobuf-c-dev liblwgeom-dev pkg-config libproj-dev libevent-dev" \
 
     # Add PGDG repositories
     && export DISTRIB_CODENAME=$(sed -n 's/DISTRIB_CODENAME=//p' /etc/lsb-release) \
@@ -48,10 +48,10 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get install -y libprotobuf-c1 libevent-2.0 $BUILD_PACKAGES \
 
     # prepare bg_mon sources
-    && export BG_MON_COMMIT=9fc9427adef48d44adcd4070b05eea8e32f2a0e7 \
+    && export BG_MON_COMMIT=796690f2bee2778321a45233fe4012fc06b75f02 \
     && curl -s -L https://github.com/CyberDem0n/bg_mon/archive/$BG_MON_COMMIT.tar.gz | tar xz \
 
-    && export DECODEBUFS_COMMIT=d9415fc78fa255d990ea2371720876bebe34ceb9 \
+    && export DECODEBUFS_COMMIT=d08a75593c68897600e10f5250133337624bcf63 \
     && curl -s -L https://github.com/debezium/postgres-decoderbufs/archive/$DECODEBUFS_COMMIT.tar.gz | tar xz \
 
     && for version in ${PGOLDVERSIONS} ${PGVERSION}; do \
@@ -99,6 +99,15 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 
     && apt-get install -y skytools3-ticker \
 
+    # patch, build and install pgbouncer
+    && mkdir pgbouncer && cd pgbouncer \
+    && apt-get source pgbouncer \
+    && cd $(ls -d pgbouncer-*) \
+    && curl -sL https://github.com/pgbouncer/pgbouncer/pull/127.diff | patch -p1 \
+    && debuild -b -uc -us \
+    && dpkg -i ../pgbouncer_*.deb \
+    && cd ../.. \
+
     # install pam_oauth2.so
     && export PAM_OAUTH_COMMIT=bed1f8d31840d1fda49365921449112a7421b8ca \
     && export JSMN_COMMIT=1682c32e9ae5990ddd0f0e907270a0f6dde5cbe9 \
@@ -121,9 +130,8 @@ ENV PATH=$PATH:/usr/lib/postgresql/${PGVERSION}/bin
 # Install patroni and WAL-e
 ENV PATRONIVERSION=1.3
 ENV WALE_VERSION=1.1.0b1
-ADD wal-e-pg10.patch
 RUN export DEBIAN_FRONTEND=noninteractive \
-    export BUILD_PACKAGES="python3-pip git patch" \
+    export BUILD_PACKAGES="python3-pip python3-dev git patch gcc linux-headers-generic-lts-xenial" \
     && apt-get update \
     && apt-get install -y \
             # Required for wal-e
@@ -133,12 +141,12 @@ RUN export DEBIAN_FRONTEND=noninteractive \
             ${BUILD_PACKAGES} \
 
     && pip3 install pip --upgrade \
-    && pip3 install --upgrade 'git+https://github.com/zalando/patroni.git@e3a01727a90fdbb901c278d4b8a0fbb3e54b4005#egg=patroni' \
+    && pip3 install --upgrade 'git+https://github.com/zalando/patroni.git@d5b3d943779ebec31dc65c54c897e34d83878ea0#egg=patroni' \
             gcloud boto wal-e==$WALE_VERSION \
 
     # https://github.com/wal-e/wal-e/issues/318
     && sed -i 's/^\(    for i in range(0,\) num_retries):.*/\1 100):/g' /usr/local/lib/python3.5/dist-packages/boto/utils.py \
-    && cd /usr/local/lib/python3.5/dist-packages/wal_e && patch -p2 < /wal-e-pg10.patch \
+    && cd /usr/local/lib/python3.5/dist-packages/wal_e && curl -sL https://github.com/wal-e/wal-e/pull/339.diff | patch -p2 \
 
     # Clean up
     && apt-get purge -y ${BUILD_PACKAGES} \
@@ -166,7 +174,7 @@ ENV WALE_ENV_DIR=$PGHOME/etc/wal-e.d/env
 # Set PGHOME as a login directory for the PostgreSQL user.
 RUN usermod -d $PGHOME -m postgres
 
-ADD scm-source.json configure_spilo.py launch.sh postgres_backup.sh patroni_wait.sh post_init.sh _zmon_schema.dump callback_role.py basebackup.sh wale_restore_command.sh /
+ADD scm-source.json configure_spilo.py launch.sh postgres_backup.sh patroni_wait.sh post_init.sh _zmon_schema.dump callback_role.py basebackup.sh wale_restore_command.sh wal-e-wal-fetch.sh callback_aws.py /
 ADD supervisor.d /etc/supervisor/conf.d/
 ADD pgq_ticker.ini $PGHOME
 ADD motd /etc/
